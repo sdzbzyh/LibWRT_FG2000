@@ -1,0 +1,157 @@
+--- a/drivers/pinctrl/pinctrl-aw9523.c
++++ b/drivers/pinctrl/pinctrl-aw9523.c
+@@ -717,6 +717,11 @@
+ 	if (ret == 0)
+ 		goto done;
+ 
++	if (!awi->reset_gpio) {
++		dev_dbg(awi->dev, "No reset GPIO, skipping hard reset\n");
++		goto done;
++	}
++
+ 	dev_dbg(awi->dev, "Cannot execute soft reset: trying hard reset\n");
+ 	ret = gpiod_direction_output(awi->reset_gpio, 0);
+ 	if (ret)
+@@ -752,11 +757,12 @@
+ {
+ 	int ret, max_retries = 2;
+ 
+-	/* Sometimes the chip needs more than one reset cycle */
+ 	do {
+ 		ret = aw9523_drive_reset_gpio(awi);
+ 		if (ret == 0)
+ 			break;
++		if (!awi->reset_gpio)
++			break;
+ 		max_retries--;
+ 	} while (max_retries);
+ 
+@@ -781,7 +787,7 @@ static int aw9523_init_gpiochip(struct aw9523 *awi, unsigned int npins)
+ 	gc->set_config = gpiochip_generic_config;
+ 	gc->parent = dev;
+ 	gc->owner = THIS_MODULE;
+-	gc->can_sleep = false;
++	gc->can_sleep = true;
+ 
+ 	return 0;
+ }
+@@ -890,63 +896,68 @@
+ 	unsigned int val;
+ 	int ret;
+ 
+-	/* No register caching during initialization */
+-	regcache_cache_bypass(awi->regmap, true);
++        regcache_cache_bypass(awi->regmap, true);
+ 
+-	/* Bring up the chip */
+-	ret = aw9523_hw_reset(awi);
+-	if (ret) {
+-		dev_err(awi->dev, "HW Reset failed: %d\n", ret);
+-		return ret;
+-	}
++        ret = aw9523_hw_reset(awi);
++        if (ret) {
++        dev_err(awi->dev, "HW Reset failed: %d\n", ret);
++        goto err;
++        }
+ 
+ 	/*
+-	 * This is the expected chip and it is running: it's time to
+-	 * set a safe default configuration in case the user doesn't
+-	 * configure (all of the available) pins in this chip.
+-	 * P.S.: The writes order doesn't matter.
++	 * 先让 P0/P1 全部进入输入，避免上电默认全输出时
++	 * 后续切推挽出现“全输出 + 推挽”的危险状态。
+ 	 */
++	ret = regmap_write(awi->regmap, AW9523_REG_CONF_STATE(0), U8_MAX);
++	if (ret)
++		goto err;
++	ret = regmap_write(awi->regmap, AW9523_REG_CONF_STATE(p1_pin), U8_MAX);
++	if (ret)
++		goto err;
+ 
+-	/* Set all pins as GPIO */
+-	ret = regmap_write(awi->regmap, AW9523_REG_PORT_MODE(0), U8_MAX);
++	/* 输出寄存器清零，输入状态下无副作用，但保持干净 */
++	ret = regmap_write(awi->regmap, AW9523_REG_OUT_STATE(0), 0);
+ 	if (ret)
+-		return ret;
+-	ret = regmap_write(awi->regmap, AW9523_REG_PORT_MODE(p1_pin), U8_MAX);
++		goto err;
++	ret = regmap_write(awi->regmap, AW9523_REG_OUT_STATE(p1_pin), 0);
+ 	if (ret)
+-		return ret;
++		goto err;
+ 
+-	/* Set Open-Drain mode on Port 0 (Port 1 is always P-P) */
+-	ret = regmap_write(awi->regmap, AW9523_REG_GCR, 0);
++	/* 现在可以安全地切 P0 推挽（P1 始终推挽） */
++	ret = regmap_write(awi->regmap, AW9523_REG_GCR, AW9523_GCR_GPOMD_MASK);
+ 	if (ret)
+-		return ret;
++		goto err;
+ 
+-	/* Set all pins as inputs */
+-	ret = regmap_write(awi->regmap, AW9523_REG_CONF_STATE(0), U8_MAX);
++	/* 全部设为 GPIO 模式 */
++	ret = regmap_write(awi->regmap, AW9523_REG_PORT_MODE(0), U8_MAX);
+ 	if (ret)
+-		return ret;
+-	ret = regmap_write(awi->regmap, AW9523_REG_CONF_STATE(p1_pin), U8_MAX);
++		goto err;
++	ret = regmap_write(awi->regmap, AW9523_REG_PORT_MODE(p1_pin), U8_MAX);
+ 	if (ret)
+-		return ret;
++		goto err;
+ 
+-	/* Disable all interrupts to avoid unreasoned wakeups */
++	/* Disable all interrupts */
+ 	ret = regmap_write(awi->regmap, AW9523_REG_INTR_DIS(0), U8_MAX);
+ 	if (ret)
+-		return ret;
++		goto err;
+ 	ret = regmap_write(awi->regmap, AW9523_REG_INTR_DIS(p1_pin), U8_MAX);
+ 	if (ret)
+-		return ret;
++		goto err;
+ 
+-	/* Clear setup-generated interrupts by performing a port state read */
++	/* Clear setup-generated interrupts */
+ 	ret = aw9523_get_port_state(awi->regmap, 0, 0, &val);
+ 	if (ret)
+-		return ret;
++		goto err;
+ 	ret = aw9523_get_port_state(awi->regmap, p1_pin, 0, &val);
+ 	if (ret)
+-		return ret;
++		goto err;
+ 
+-	/* Everything went fine: activate and reinitialize register cache */
+ 	regcache_cache_bypass(awi->regmap, false);
+-	return regmap_reinit_cache(awi->regmap, &aw9523_regmap);
++        return regmap_reinit_cache(awi->regmap, &aw9523_regmap);
++
++    err:
++        regcache_cache_bypass(awi->regmap, false);
++        return ret;
+ }
+ 
+ static int aw9523_probe(struct i2c_client *client)
+@@ -963,10 +974,15 @@
+ 	i2c_set_clientdata(client, awi);
+ 
+ 	awi->dev = dev;
+-	awi->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
++	awi->reset_gpio = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
+ 	if (IS_ERR(awi->reset_gpio))
+ 		return PTR_ERR(awi->reset_gpio);
+-	gpiod_set_consumer_name(awi->reset_gpio, "aw9523 reset");
++	if (awi->reset_gpio) {
++		gpiod_set_consumer_name(awi->reset_gpio, "aw9523 reset");
++		dev_info(dev, "using reset GPIO, soft reset first\n");
++	} else {
++		dev_info(dev, "no reset GPIO, using soft reset only\n");
++	}
+ 
+ 	awi->regmap = devm_regmap_init_i2c(client, &aw9523_regmap);
+ 	if (IS_ERR(awi->regmap))

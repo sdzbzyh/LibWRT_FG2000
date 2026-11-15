@@ -1,0 +1,18 @@
+#!/bin/sh
+[ -f /etc/config/fstab ] && exit 0
+
+# 生成基础配置，但通过管道过滤掉系统自动管理的 /overlay 和 /rom 挂载点
+block detect | grep -v -E "target '(/(overlay|rom))'" > /etc/config/fstab
+
+# 追加全局配置段，设置 delay_root 为 5 秒，并关闭匿名挂载等可能引入延迟的选项
+cat >> /etc/config/fstab <<EOF
+config global
+	option anon_swap '0'
+	option anon_mount '0'
+	option auto_swap '0'
+	option auto_mount '1'
+	option delay_root '5'
+	option check_fs '0'
+EOF
+
+exit 0

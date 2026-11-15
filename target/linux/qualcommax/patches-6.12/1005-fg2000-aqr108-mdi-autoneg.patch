@@ -1,0 +1,20 @@
+--- a/drivers/net/phy/aquantia/aquantia_main.c
++++ b/drivers/net/phy/aquantia/aquantia_main.c
+@@ -645,6 +645,17 @@
+ 			return ret;
+ 	}
+ 
++	/* FG2000-AQR-MDI-ANEG: 固件加载后显式触发 MDI 侧 autoneg。
++	 * phylink 的 config_aneg 可能在固件刚启动的窗口内没有生效，
++	 * 导致 AQR108 的 MDI 侧不发送 autoneg 帧，网口灯不亮、
++	 * 对端无反应。这里在 config_init 末尾显式重启一次。
++	 */
++	if (phydev->autoneg == AUTONEG_ENABLE) {
++		ret = genphy_c45_restart_aneg(phydev);
++		if (ret)
++			return ret;
++	}
++
+ 	return 0;
+ }
+ 

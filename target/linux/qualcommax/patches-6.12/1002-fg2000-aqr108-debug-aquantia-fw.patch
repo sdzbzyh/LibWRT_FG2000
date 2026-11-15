@@ -1,0 +1,47 @@
+--- a/drivers/net/phy/aquantia/aquantia_firmware.c
++++ b/drivers/net/phy/aquantia/aquantia_firmware.c
+@@ -330,8 +330,12 @@
+ 
+ 	ret = of_property_read_string(dev->of_node, "firmware-name",
+ 				      &fw_name);
+-	if (ret)
++	if (ret) {
++		dev_info(dev, "FG2000-AQR-DEBUG: no firmware-name property, ret=%d, skip\n", ret);
++		if (ret == -EINVAL)
++			return 0;
+ 		return ret;
++	}
+ 
+ 	ret = request_firmware(&fw, fw_name, dev);
+ 	if (ret) {
+@@ -357,9 +361,11 @@
+ 	 * the current version returned by the PHY.
+ 	 */
+ 	ret = aqr_wait_reset_complete(phydev);
++	phydev_info(phydev, "FG2000-AQR-DEBUG: aqr_wait_reset_complete ret=%d\n", ret);
+ 	switch (ret) {
+ 	case 0:
+ 		/* Some firmware is loaded => do nothing */
++		phydev_info(phydev, "FG2000-AQR-DEBUG: firmware already loaded\n");
+ 		return 0;
+ 	case -ETIMEDOUT:
+ 		/* VEND1_GLOBAL_FW_ID still reads 0 after 2 seconds of polling.
+@@ -368,15 +374,18 @@
+ 		 * assume that, and load a new image.
+ 		 */
+ 		ret = aqr_firmware_load_nvmem(phydev);
++		phydev_info(phydev, "FG2000-AQR-DEBUG: nvmem load ret=%d\n", ret);
+ 		if (ret == -EPROBE_DEFER || !ret)
+ 			return ret;
+ 
+ 		ret = aqr_firmware_load_fs(phydev);
++		phydev_info(phydev, "FG2000-AQR-DEBUG: fs load ret=%d\n", ret);
+ 		if (ret)
+ 			return ret;
+ 		break;
+ 	default:
+ 		/* PHY read error, propagate it to the caller */
++		phydev_info(phydev, "FG2000-AQR-DEBUG: reset_complete error ret=%d\n", ret);
+ 		return ret;
+ 	}
+ 

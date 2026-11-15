@@ -1,0 +1,27 @@
+#!/bin/sh
+# FG2000 LED 默认配置
+
+uci -q batch <<EOF
+set system.led_green_lan=led
+set system.led_green_lan.name='fg2000:green:lan'
+set system.led_green_lan.sysfs='fg2000:green:lan'
+set system.led_green_lan.trigger='netdev'
+set system.led_green_lan.dev='br-lan'
+add_list system.led_green_lan.mode='tx'
+add_list system.led_green_lan.mode='rx'
+
+set system.led_red_status=led
+set system.led_red_status.name='fg2000:red:status'
+set system.led_red_status.sysfs='fg2000:red:status'
+set system.led_red_status.trigger='default-off'
+
+set system.led_blue_wlan=led
+set system.led_blue_wlan.name='fg2000:blue:wlan'
+set system.led_blue_wlan.sysfs='fg2000:blue:wlan'
+set system.led_blue_wlan.trigger='netdev'
+set system.led_blue_wlan.dev='phy0-ap0'
+add_list system.led_blue_wlan.mode='tx'
+add_list system.led_blue_wlan.mode='rx'
+EOF
+
+exit 0

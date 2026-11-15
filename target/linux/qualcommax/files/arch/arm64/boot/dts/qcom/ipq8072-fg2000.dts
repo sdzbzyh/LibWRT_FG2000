@@ -1,0 +1,538 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+ *
+ * Copyright (c) 2018 Teemo Pango <teemopango@gmail.com>
+ *
+ */
+
+/dts-v1/;
+
+#include "ipq8074.dtsi"
+#include "ipq8074-ess.dtsi"
+#include "ipq8074-nss.dtsi"
+#include "ipq8074-hk-cpu.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	model = "Inseego FG2000";
+	compatible = "inseego,fg2000", "qcom,ipq8074";
+
+	aliases {
+		serial0 = &blsp1_uart5;
+		sdhc1 = &sdhc_1;
+		ethernet0 = &dp1;
+		ethernet1 = &dp2;
+		ethernet2 = &dp3;
+		ethernet3 = &dp4;
+		ethernet4 = &dp5;
+		ethernet5 = &dp6;
+		label-mac-device = &dp3;
+
+		led-boot = &led_red;
+		led-running = &led_green;
+		led-failsafe = &led_red;
+		led-upgrade = &led_blue;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+		bootargs-append = " swiotlb=1 coherent_pool=2M";
+	};
+
+	keys {
+		compatible = "gpio-keys";
+
+		wps-button {
+			label = "wps";
+			gpios = <&tlmm 47 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_WPS_BUTTON>;
+		};
+
+		reset-button {
+			label = "reset";
+			gpios = <&tlmm 1 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led_red: led-red {
+			label = "fg2000:red:status";
+			gpios = <&aw9523_i2c5_5b 5 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+		};
+
+		led_green: led-green {
+			label = "fg2000:green:lan";
+			gpios = <&aw9523_i2c5_5b 3 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+		};
+
+		led_blue: led-blue {
+			label = "fg2000:blue:wlan";
+			gpios = <&aw9523_i2c5_5b 2 GPIO_ACTIVE_HIGH>;
+			default-state = "off";
+		};
+	};
+
+	fan: gpio-fan {
+		#cooling-cells = <2>;
+		compatible = "gpio-fan";
+		gpios = <&tlmm 8 GPIO_ACTIVE_HIGH>;
+		gpio-fan,speed-map = <0 0>, <1 1>;
+	};
+};
+
+&cpu0_thermal {
+	trips {
+		cpu0_trip_active: cpu-active {
+			temperature = <60000>;
+			hysteresis = <2000>;
+			type = "active";
+		};
+	};
+	cooling-maps {
+		cpu-active {
+			cooling-device = <&fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+			trip = <&cpu0_trip_active>;
+		};
+	};
+};
+
+&cpu1_thermal {
+	trips {
+		cpu1_trip_active: cpu-active {
+			temperature = <60000>;
+			hysteresis = <2000>;
+			type = "active";
+		};
+	};
+	cooling-maps {
+		cpu-active {
+			cooling-device = <&fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+			trip = <&cpu1_trip_active>;
+		};
+	};
+};
+
+&cpu2_thermal {
+	trips {
+		cpu2_trip_active: cpu-active {
+			temperature = <60000>;
+			hysteresis = <2000>;
+			type = "active";
+		};
+	};
+	cooling-maps {
+		cpu-active {
+			cooling-device = <&fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+			trip = <&cpu2_trip_active>;
+		};
+	};
+};
+
+&cpu3_thermal {
+	trips {
+		cpu3_trip_active: cpu-active {
+			temperature = <60000>;
+			hysteresis = <2000>;
+			type = "active";
+		};
+	};
+	cooling-maps {
+		cpu-active {
+			cooling-device = <&fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+			trip = <&cpu3_trip_active>;
+		};
+	};
+};
+
+&cluster_thermal {
+	trips {
+		cluster_active: cluster-active {
+			temperature = <60000>;
+			hysteresis = <2000>;
+			type = "active";
+		};
+	};
+	cooling-maps {
+		cluster-active {
+			cooling-device = <&fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+			trip = <&cluster_active>;
+		};
+	};
+};
+
+&tlmm {
+	fg2000_mdio_pins: mdio-state {
+		mdc-pins {
+			pins = "gpio68";
+			function = "mdc";
+			drive-strength = <8>;
+			bias-disable;
+		};
+
+		mdio-pins {
+			pins = "gpio69";
+			function = "mdio";
+			drive-strength = <8>;
+			bias-pull-up;
+		};
+	};
+
+	i2c_2_pins: i2c-2-state {
+		pins = "gpio21", "gpio22";
+		function = "blsp4_i2c1";
+		drive-strength = <8>;
+		bias-pull-up;
+	};
+
+	/*
+	 * AQR108 电源使能 gpio11-14 和复位 gpio50 不在 Linux 侧声明。
+	 * U-Boot 的 board_init 已经把 gpio11-14 拉高，
+	 * aqr108_rst_gpio_set 已经完成 gpio50 复位脉冲。
+	 * Linux 完全不碰这些 GPIO，保持 U-Boot 配置的状态。
+	 * 与 QSDK 的行为一致。
+	 */
+};
+
+&edma {
+	status = "okay";
+};
+
+&blsp1_uart5 {
+	status = "okay";
+};
+
+&prng {
+	status = "okay";
+};
+
+&ssphy_0 {
+	status = "okay";
+};
+
+&qusb_phy_0 {
+	status = "okay";
+};
+
+&ssphy_1 {
+	status = "okay";
+};
+
+&qusb_phy_1 {
+	status = "okay";
+};
+
+&usb_0 {
+	status = "okay";
+};
+
+&usb_1 {
+	status = "okay";
+};
+
+&cryptobam {
+	status = "okay";
+};
+
+&crypto {
+	status = "okay";
+};
+
+&blsp1_spi1 {
+	status = "okay";
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		spi-max-frequency = <50000000>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		reg = <0>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "0:sbl1";
+				reg = <0x0 0x50000>;
+			};
+
+			partition@50000 {
+				label = "0:mibib";
+				reg = <0x50000 0x10000>;
+			};
+
+			partition@60000 {
+				label = "0:bootconfig";
+				reg = <0x60000 0x20000>;
+			};
+
+			partition@80000 {
+				label = "0:bootconfig1";
+				reg = <0x80000 0x20000>;
+			};
+
+			partition@a0000 {
+				label = "0:qsee";
+				reg = <0xa0000 0x180000>;
+			};
+
+			partition@220000 {
+				label = "0:qsee_1";
+				reg = <0x220000 0x180000>;
+			};
+
+			partition@3a0000 {
+				label = "0:devcfg";
+				reg = <0x3a0000 0x10000>;
+			};
+
+			partition@3b0000 {
+				label = "0:devcfg_1";
+				reg = <0x3b0000 0x10000>;
+			};
+
+			partition@3c0000 {
+				label = "0:apdp";
+				reg = <0x3c0000 0x10000>;
+			};
+
+			partition@3d0000 {
+				label = "0:apdp_1";
+				reg = <0x3d0000 0x10000>;
+			};
+
+			partition@3e0000 {
+				label = "0:rpm";
+				reg = <0x3e0000 0x40000>;
+			};
+
+			partition@420000 {
+				label = "0:rpm_1";
+				reg = <0x420000 0x40000>;
+			};
+
+			partition@460000 {
+				label = "0:cdt";
+				reg = <0x460000 0x10000>;
+			};
+
+			partition@470000 {
+				label = "0:cdt_1";
+				reg = <0x470000 0x10000>;
+			};
+
+			partition@480000 {
+				label = "0:appsblenv";
+				reg = <0x480000 0x10000>;
+			};
+
+			partition@490000 {
+				label = "0:appsbl";
+				reg = <0x490000 0xa0000>;
+			};
+
+			partition@530000 {
+				label = "0:appsbl_1";
+				reg = <0x530000 0xa0000>;
+			};
+
+			partition@5d0000 {
+				label = "0:art";
+				reg = <0x5d0000 0x40000>;
+			};
+
+			partition@610000 {
+				label = "0:ethphyfw";
+				reg = <0x610000 0x80000>;
+				compatible = "nvmem-cells";
+				#address-cells = <1>;
+				#size-cells = <1>;
+
+				/*
+				 * QSDK ethphyfw 分区的 .cld 实际大小是 0x5fc02，
+				 * MBN 头 0x28 字节，nvmem 从 0x28 开始读 0x5fc02。
+				 * 如果换回自己的 .cld（0x60002），需要改回 0x60002。
+				 */
+				aqr108_fw: firmware@0 {
+					reg = <0x28 0x5fc02>;
+				};
+			};
+		};
+	};
+};
+
+&blsp1_i2c5 {
+	status = "okay";
+	pinctrl-0 = <&i2c_2_pins>;
+	pinctrl-names = "default";
+
+	aw9523_i2c5_5b: gpio-expander@5b {
+		compatible = "awinic,aw9523-pinctrl";
+		reg = <0x5b>;
+		gpio-controller;
+		#gpio-cells = <2>;
+		status = "okay";
+	};
+};
+
+&sdhc_1 {
+	status = "okay";
+
+	/delete-property/ mmc-hs400-1_8v;
+	mmc-hs200-1_8v;
+	mmc-ddr-1_8v;
+	vqmmc-supply = <&l11>;
+};
+
+&mdio {
+	status = "okay";
+	pinctrl-0 = <&fg2000_mdio_pins>;
+	pinctrl-names = "default";
+	reset-gpios = <&tlmm 37 GPIO_ACTIVE_LOW>;
+
+	ethernet-phy-package@0 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		compatible = "qcom,qca8075-package";
+		reg = <0>;
+		qcom,package-mode = "psgmii";
+
+		qca8075_0: ethernet-phy@0 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <0>;
+		};
+
+		qca8075_1: ethernet-phy@1 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <1>;
+		};
+
+		qca8075_2: ethernet-phy@2 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <2>;
+		};
+
+		qca8075_3: ethernet-phy@3 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <3>;
+		};
+
+		qca8075_4: ethernet-phy@4 {
+			compatible = "ethernet-phy-ieee802.3-c22";
+			reg = <4>;
+		};
+	};
+
+	/*
+	 * 与 QSDK 对齐：不在 AQR108 节点声明 reset-gpios。
+	 * U-Boot 的 aqr108_rst_gpio_set 已经完成复位，
+	 * Linux 不再触发复位脉冲，保持 PHY 固件运行状态。
+	 */
+	aqr108: ethernet-phy@7 {
+		compatible = "ethernet-phy-ieee802.3-c45";
+		reg = <7>;
+
+		nvmem-cells = <&aqr108_fw>;
+		nvmem-cell-names = "firmware";
+	};
+};
+
+&dp1 {
+	status = "disabled";
+	phy-handle = <&qca8075_0>;
+};
+
+&dp2 {
+	status = "disabled";
+	phy-handle = <&qca8075_1>;
+};
+
+&dp3 {
+	status = "okay";
+	phy-handle = <&qca8075_2>;
+	label = "wan";
+};
+
+&dp4 {
+	status = "okay";
+	phy-handle = <&qca8075_3>;
+	label = "lan1";
+};
+
+&dp5 {
+	status = "okay";
+	phy-handle = <&qca8075_4>;
+	label = "lan2";
+};
+
+/*
+ * 与 QSDK 对齐：phy-mode = "sgmii" + qcom,mactype = <1>。
+ * QSDK 的 dp6 用 sgmii + mactype=1 表示 10G，nss-dp 靠 mactype
+ * 判断 10G，phy-mode 只是传给 PHY 驱动的 interface 描述。
+ */
+&dp6 {
+	status = "okay";
+	phy-mode = "sgmii";
+	phy-handle = <&aqr108>;
+	qcom,mactype = <1>;
+	label = "lan3";
+};
+
+&switch {
+	status = "okay";
+	/* 与 QSDK 对齐：port 1-5 为 LAN，port 6（AQR108）为 WAN */
+	switch_lan_bmp = <(ESS_PORT1 | ESS_PORT2 | ESS_PORT3 | ESS_PORT4 | ESS_PORT5)>;
+	switch_wan_bmp = <ESS_PORT6>;
+	switch_mac_mode = <MAC_MODE_PSGMII>;
+	switch_mac_mode1 = <MAC_MODE_DISABLED>;
+	switch_mac_mode2 = <MAC_MODE_USXGMII>;
+
+	qcom,port_phyinfo {
+		port@1 {
+			port_id = <1>;
+			phy_address = <0>;
+		};
+
+		port@2 {
+			port_id = <2>;
+			phy_address = <1>;
+		};
+
+		port@3 {
+			port_id = <3>;
+			phy_address = <2>;
+		};
+
+		port@4 {
+			port_id = <4>;
+			phy_address = <3>;
+		};
+
+		port@5 {
+			port_id = <5>;
+			phy_address = <4>;
+		};
+
+		port@6 {
+			port_id = <6>;
+			phy_address = <7>;
+			compatible = "ethernet-phy-ieee802.3-c45";
+			ethernet-phy-ieee802.3-c45;
+		};
+	};
+};
+
+&wifi {
+	status = "okay";
+	compatible = "qcom,ipq8074-wifi";
+	qcom,ath11k-fw-memory-mode = <1>;
+	qcom,ath11k-calibration-variant = "Inseego-FG2000";
+};

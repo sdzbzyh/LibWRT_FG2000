@@ -1,0 +1,17 @@
+--- a/drivers/net/mdio/fwnode_mdio.c
++++ b/drivers/net/mdio/fwnode_mdio.c
+@@ -139,6 +139,14 @@
+ 	}
+ 
+ 	is_c45 = fwnode_device_is_compatible(child, "ethernet-phy-ieee802.3-c45");
++	{
++		u32 dbg_phy_id = 0;
++		int dbg_ret;
++
++		dbg_ret = fwnode_get_phy_id(child, &dbg_phy_id);
++		dev_info(&bus->dev, "FG2000-DEBUG: addr=%u is_c45=%d get_phy_id_ret=%d phy_id=0x%08x fwnode=%pfw\n",
++			 addr, is_c45, dbg_ret, dbg_phy_id, child);
++	}
+ 	if (is_c45 || fwnode_get_phy_id(child, &phy_id))
+ 		phy = get_phy_device(bus, addr, is_c45);
+ 	else
