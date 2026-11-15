@@ -46,7 +46,7 @@ index ef1b4c81843a3..3628e33e57f6e 100644
 +	ath11k_core_create_firmware_path(ab, name, path, sizeof(path));
 +	ret = request_firmware_direct(&ab->fw.fw, path, ab->dev);
 +	if (ret) {
- 		ath11k_dbg(ab, ATH11K_DBG_BOOT, "failed to load %s: %d\\n", name, ret);
+ 		ath11k_dbg(ab, ATH11K_DBG_BOOT, "failed to load %s: %d\n", name, ret);
  		ab->fw.fw = NULL;
  		return ret;
 -- 
