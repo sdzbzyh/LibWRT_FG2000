@@ -1,10 +1,24 @@
 #!/bin/sh
 [ -f /etc/config/fstab ] && exit 0
 
-# 生成基础配置，但通过管道过滤掉系统自动管理的 /overlay 和 /rom 挂载点
-block detect | grep -v -E "target '(/(overlay|rom))'" > /etc/config/fstab
+# Generate detected mount/swap entries, excluding system-managed /overlay and /rom.
+# block detect may emit its own "config global" section; remove it so the
+# global settings appended below are the only global section.
+block detect | grep -v -E "target '(/(overlay|rom))'" | awk '
+/^[[:space:]]*config[[:space:]]+global([[:space:]]|$)/ {
+	skip_global = 1
+	next
+}
+/^[[:space:]]*config[[:space:]]+/ {
+	skip_global = 0
+}
+!skip_global {
+	print
+}
+' > /etc/config/fstab
 
-# 追加全局配置段，设置 delay_root 为 5 秒，并关闭匿名挂载等可能引入延迟的选项
+# Keep exactly one global section. Disable anonymous mounts to prevent
+# unrelated partitions (including vendor WIFIFW volumes) from being mounted.
 cat >> /etc/config/fstab <<EOF
 config global
 	option anon_swap '0'
