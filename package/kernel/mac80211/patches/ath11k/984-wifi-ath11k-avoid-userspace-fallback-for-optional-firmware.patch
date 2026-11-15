@@ -1,0 +1,52 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: OpenWrt Local Patch <noreply@example.com>
+Date: Sun, 15 Nov 2026 12:30:00 +0800
+Subject: [PATCH] wifi: ath11k: avoid user-space fallback for optional
+ firmware-N.bin
+
+ath11k_fw_pre_init() requests the optional firmware-2.bin through
+ath11k_core_firmware_request(), which uses firmware_request_nowarn().
+When the file is absent and the firmware user-helper fallback is enabled,
+the request can still trigger a user-space firmware request and wait for
+the configured timeout before ath11k falls back to firmware API 1.
+
+Use request_firmware_direct() for this optional API-N bundle lookup.
+It checks the filesystem without invoking the user-space fallback loader.
+The normal API 1 fallback remains unchanged.
+
+This avoids the unnecessary firmware-loader timeout when firmware-2.bin
+is not installed.
+
+Based on the upstream ath11k patch:
+https://lore.kernel.org/ath11k/20261101-b123-fw-api-n-direct-v1-1-a9b734520abc@gmail.com/
+
+Signed-off-by: OpenWrt Local Patch <noreply@example.com>
+---
+ drivers/net/wireless/ath/ath11k/fw.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/net/wireless/ath/ath11k/fw.c b/drivers/net/wireless/ath/ath11k/fw.c
+index ef1b4c81843a3..3628e33e57f6e 100644
+--- a/drivers/net/wireless/ath/ath11k/fw.c
++++ b/drivers/net/wireless/ath/ath11k/fw.c
+@@ -16,10 +16,14 @@ static int ath11k_fw_request_firmware_api_n(struct ath11k_base *ab,
+ 	struct ath11k_fw_ie *hdr;
+ 	const u8 *data;
+ 	__le32 *timestamp;
+-
+-	ab->fw.fw = ath11k_core_firmware_request(ab, name);
+-	if (IS_ERR(ab->fw.fw)) {
+-		ret = PTR_ERR(ab->fw.fw);
++	char path[100];
++
++	/* The file is optional: look for it on the filesystem only, so a
++	 * missing one does not go through the user-space fallback loader.
++	 */
++	ath11k_core_create_firmware_path(ab, name, path, sizeof(path));
++	ret = request_firmware_direct(&ab->fw.fw, path, ab->dev);
++	if (ret) {
+ 		ath11k_dbg(ab, ATH11K_DBG_BOOT, "failed to load %s: %d\n", name, ret);
+ 		ab->fw.fw = NULL;
+ 		return ret;
+-- 
+2.43.0
