@@ -1,26 +1,27 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: OpenWrt Local Patch <noreply@example.com>
-Date: Sun, 15 Nov 2026 12:30:00 +0800
-Subject: [PATCH] wifi: ath11k: avoid user-space fallback for optional
- firmware-N.bin
+From: Christopher Griffin <christophergriffin05@gmail.com>
+Date: Sun, 1 Nov 2026 10:06:23 -0600
+Subject: [PATCH] wifi: ath11k: look for firmware-N.bin without the
+ user-space fallback
 
-ath11k_fw_pre_init() requests the optional firmware-2.bin through
-ath11k_core_firmware_request(), which uses firmware_request_nowarn().
-When the file is absent and the firmware user-helper fallback is enabled,
-the request can still trigger a user-space firmware request and wait for
-the configured timeout before ath11k falls back to firmware API 1.
+ath11k_fw_pre_init() asks for firmware-2.bin through
+ath11k_core_firmware_request(), that is firmware_request_nowarn(), and
+falls back to API 1 when the file is not there. The file is optional,
+and many installations have none.
 
-Use request_firmware_direct() for this optional API-N bundle lookup.
-It checks the filesystem without invoking the user-space fallback loader.
-The normal API 1 fallback remains unchanged.
+With CONFIG_FW_LOADER_USER_HELPER_FALLBACK enabled,
+firmware_request_nowarn() can still hand a missing file to the user-space
+loader. This makes every probe wait for a uevent and its response before
+ath11k can fall back to API 1.
 
-This avoids the unnecessary firmware-loader timeout when firmware-2.bin
-is not installed.
+Request the optional API-N firmware with request_firmware_direct()
+instead. This checks the filesystem only and does not invoke the
+user-space fallback loader.
 
-Based on the upstream ath11k patch:
+Based on the upstream patch:
 https://lore.kernel.org/ath11k/20261101-b123-fw-api-n-direct-v1-1-a9b734520abc@gmail.com/
 
-Signed-off-by: OpenWrt Local Patch <noreply@example.com>
+Signed-off-by: Christopher Griffin <christophergriffin05@gmail.com>
 ---
  drivers/net/wireless/ath/ath11k/fw.c | 12 ++++++++----
  1 file changed, 8 insertions(+), 4 deletions(-)
@@ -45,7 +46,7 @@ index ef1b4c81843a3..3628e33e57f6e 100644
 +	ath11k_core_create_firmware_path(ab, name, path, sizeof(path));
 +	ret = request_firmware_direct(&ab->fw.fw, path, ab->dev);
 +	if (ret) {
- 		ath11k_dbg(ab, ATH11K_DBG_BOOT, "failed to load %s: %d\n", name, ret);
+ 		ath11k_dbg(ab, ATH11K_DBG_BOOT, "failed to load %s: %d\\n", name, ret);
  		ab->fw.fw = NULL;
  		return ret;
 -- 
